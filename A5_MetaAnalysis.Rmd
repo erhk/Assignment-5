@@ -30,9 +30,42 @@ files = read.delim("Data.csv", header = TRUE, sep =";")
 1. What is the current evidence for distinctive patterns of pitch mean and pitch sd in schizophrenia? Report how many papers report quantitative estimates, your method to analyze them, the estimated effect size of the difference (mean effect size and standard error for pitch mean, same for pitch sd) and forest plots representing it. 
 ```{r}
 library(metafor)
-install.packages("metafor", dependencies = T)
+#install.packages("metafor", dependencies = T)
 
-PitchRange= escalc('SMD', n1i=SampleSizeSchizo, n2i=SampleSizeContros, m1i=PitchMeanControls, m2i=PitchMeanSchizo, sd1i=PitchMeanSchizoSD, sd2i=PitchMeanControlsSD, data = files)
+
+sum(files$SampleSizeSchizo)
+#518 Schitzophrenic participants
+mean(files$SampleSizeSchizo)
+#37
+
+
+sum(files$SampleSizeContros, na.rm = T)
+#216 Control participants
+mean(files$SampleSizeContros, na.rm = T)
+#24
+
+#734 overall across studies.
+
+
+#Control
+table(files$PitchMeanControls, exclude=NULL) 
+#4 reported, 10 didn't
+table(files$PitchMeanControlsSD, exclude=NULL) 
+#4 studies reported this, 10 didnt
+table(files$PitchSDControls, exclude=NULL)
+#6 reported, 8 didn't
+table(files$PitchSDControlsSD, exclude=NULL)
+#6 reported, 8 didn't
+
+#Schitzo
+table(files$PitchMeanSchizo, exclude=NULL) 
+#4 reported, 10 didn't 
+table(files$PitchMeanSchizoSD, exclude=NULL) 
+#4 reported, 10 didn't
+table(files$PitchSDSchizo, exclude=NULL)
+#11 reported, 3 didn't
+table(files$PitchSDSchizoSD, exclude=NULL)
+#11 reported, 3 didn't
 
 #N1i = sample size schi
 #N12 = sample size control
@@ -41,11 +74,36 @@ PitchRange= escalc('SMD', n1i=SampleSizeSchizo, n2i=SampleSizeContros, m1i=Pitch
 #sd1i = mean SD schi
 #sd2i = mean SD control
 
+#Mean
+PitchMean= escalc('SMD', n1i=SampleSizeSchizo, n2i=SampleSizeContros, m1i=PitchMeanControls, m2i=PitchMeanSchizo, sd1i=PitchMeanSchizoSD, sd2i=PitchMeanControlsSD, data = files)
+
 #Rma model. Slab means random effect, we control for different methods for the articles.
 #yi = effectsize, vi = SD^2
-rma = rma(yi, vi, data = PitchRange, slab = Article)
+rma1 = rma(yi, vi, data = PitchMean, slab = Article)
 
-rmaPlot = forest(rma)
+#Forrest plot
+rmaPlotMean = forest(rma1)
+
+
+#Lmer test
+Model1 <- lmer(yi ~ 1 + (1|Article), weights = 1/vi, data=PitchMean, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore"))
+
+#SD_________________________________________________________________________________
+
+#SD
+PitchSD = escalc('SMD', n1i= SampleSizeSchizo, n2i=SampleSizeContros, m1i= PitchSDControls, m2i= PitchSDSchizo, sd1i=PitchSDControlsSD, sd2i=PitchSDSchizoSD, data = files)
+
+#RMA
+rma2 = rma(yi, vi, data=PitchSD, slab=Article)
+
+#Forest
+rmaPlotSD = forest(rma2)
+
+#Lmer test
+Model2 <- lmer(yi ~ 1 + (1|Article), weights = 1/vi, data=PitchSD, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore"))
+
+
+
 ```
 
 
@@ -54,29 +112,124 @@ rmaPlot = forest(rma)
 #Load own data from assignment 3
 A3_data <- read.delim("final_rqax.csv", header = TRUE, sep =",")
 
-library(lme4);library(lmerTest)
-A3_Model <- lmer(diagnosis ~ scale(mean) + (1+diagnosis|study), A3_data)
-summary(A3_Model)
-#SD^2 = 2
-#Effectsize = -0.03619
+#For Control Mean
+#Mean = 135.0317
+mean(A3_data$mean[A3_data$diagnosis == "control"])
+#SD = 47.7987
+sd(A3_data$mean[A3_data$diagnosis=="control"])
 
-yi <- -0.03619  
-vi <- 2 
+#For Control SD
+#Mean = 25.61366
+mean(A3_data$stdDev[A3_data$diagnosis == "control"])
+#SD = 17.90346
+sd(A3_data$stdDev[A3_data$diagnosis=="control"])
 
-A3 <- data(A3, 2017, SampleSize, yi, vi)
+#For Schi Mean
+#Mean = 149.079
+mean(A3_data$mean[A3_data$diagnosis == "schizophrenia"])
+#SD = 57.83132
+sd(A3_data$mean[A3_data$diagnosis=="schizophrenia"])
+
+#For Schi SD
+#Mean = 24.02952
+mean(A3_data$stdDev[A3_data$diagnosis == "schizophrenia"])
+#SD = 36.78883
+sd(A3_data$stdDev[A3_data$diagnosis=="schizophrenia"])
 
 #Find variables for A3
-more = filter(A3_data, diagnosis == "control")
-count(unique(more$participant))
+#Get controls
+Samp_Con =length(unique(A3_data$participant[A3_data$diagnosis == "control"]))
 
-more1 = filter(A3_data, diagnosis == "schizophrenia")
-count(unique(more1$participant))
+Samp_Schi = length(unique(A3_data$participant[A3_data$diagnosis == "schizophrenia"]))
+
+#Make df so i can bind my variables to the meta set.  
+A3 <- data.frame("Article" = "BAMF", "Year" = "2017", "SampleSizeSchizo" = Samp_Schi, "SampleSizeContros" = Samp_Con, "PitchMeanControls" = 135.0317, "PitchMeanControlsSD" = 47.7987, "PitchMeanSchizo" = 149.079, "PitchMeanSchizoSD"= 57.83132, "PitchSDControls" =25.61366, "PitchSDControlsSD" = 17.90346, "PitchSDSchizo" = 24.02952, "PitchSDSchizoSD" = 36.78883)
+
+#Bind by rows
+Combo <- rbind(files, A3)
+
+#New mean for participants
+mean(Combo$SampleSizeSchizo)
+#38.333
+mean(Combo$SampleSizeContros, na.rm = T)
+#27.5
+
+#N1i = sample size schi
+#N12 = sample size control
+#m1i = mean size schi
+#m2i = mean size control
+#sd1i = mean SD schi
+#sd2i = mean SD control
+
+NEW_PitchMean= escalc('SMD', n1i=SampleSizeSchizo, n2i=SampleSizeContros, m1i=PitchMeanControls, m2i=PitchMeanSchizo, sd1i=PitchMeanSchizoSD, sd2i=PitchMeanControlsSD, data = Combo)
+
+#Rma model. Slab means random effect, we control for different methods for the articles.
+#yi = effectsize, vi = SD^2
+rmaComboMean = rma(yi, vi, data = NEW_PitchMean, slab = Article)
+
+#Forrest plot
+ComboMeanPlot = forest(rmaComboMean)
+
+#SD
+NEW_PitchSD = escalc('SMD', n1i= SampleSizeSchizo, n2i=SampleSizeContros, m1i= PitchSDControls, m2i= PitchSDSchizo, sd1i=PitchSDControlsSD, sd2i=PitchSDSchizoSD, data = Combo)
+
+#RMA
+rmaComboSD = rma(yi, vi, data=NEW_PitchSD, slab=Article)
+
+#Forest
+ComboSDPlot = forest(rmaComboSD)
+
+
 
 
 
 ```
 
+
 3. Assess the quality of the literature: report and comment on heterogeneity of the studies (tau, I2), on publication bias (funnel plot), and on influential studies.
+
+
+```{r}
+#Heterogeneity
+
+#RMA Mean
+rmaComboMean = rma(yi, vi, data = NEW_PitchMean, slab = Article)
+
+
+#RMA SD
+rmaComboSD = rma(yi, vi, data=NEW_PitchSD, slab=Article)
+
+#Testing for influential studies
+inf <- influence(rmaComboMean)
+print(inf)
+plot(inf)
+
+inf2 <- influence(rmaComboSD)
+print(inf2)
+plot(inf2)
+
+#Rank test
+#Mean
+ranktest(rmaComboMean)
+#SD
+ranktest(rmaComboSD)
+#Funnel plot
+#Mean
+funnel(rmaComboMean, main = "Random-Effects Model",xlab = "Standardized Mean Difference")
+
+#SD
+funnel(rmaComboSD, main = "Random-Effects Model",xlab = "Standardized Mean Difference")
+
+#Reg test
+regtest(rmaComboMean)
+
+regtest(rmaComboSD)
+
+
+
+```
+
+
 
 ## Tips on the process to follow:
 
